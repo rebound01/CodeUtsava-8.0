@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Security Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            margin-top: 0;
+            color: #1a1a1a;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+
+        .alert {
+            background-color: #ffe0e0;
+            color: #d32f2f;
+        }
+
+        .clear {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .timestamp {
+            color: #666;
+            font-size: 0.8em;
+            margin-top: 10px;
+        }
+
+        .environmental-readings {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .reading {
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .reading.alert {
+            background-color: #ffe0e0;
+        }
+        table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+
+th {
+    background-color: #f2f2f2;
+}
+
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="card" id="motion-card">
+            <h2>Motion Sensors</h2>
+            <div id="motion-status" class="status clear">
+                No motion detected
+            </div>
+        </div>
+
+        <div class="card" id="door-card">
+            <h2>Door Sensors</h2>
+            <div id="door-status" class="status clear">
+                All doors closed
+            </div>
+        </div>
+
+        <div class="card" id="window-card">
+            <h2>Window Sensors</h2>
+            <div id="window-status" class="status clear">
+                All windows closed
+            </div>
+        </div>
+
+        <div class="card" id="camera-card">
+            <h2>Security Cameras</h2>
+            <div id="camera-status" class="status clear">
+                No events detected
+            </div>
+        </div>
+
+        <div class="card" id="environmental-card">
+            <h2>Environmental Sensors</h2>
+            <div class="environmental-readings">
+                <div class="reading" id="temperature">
+                    Temperature: --°F
+                </div>
+                <div class="reading" id="humidity">
+                    Humidity: --%
+                </div>
+                <div class="reading" id="smoke">
+                    Smoke: Clear
+                </div>
+                <div class="reading" id="co">
+                    CO: Clear
+                </div>
+            </div>
+        </div>
+        <div>
+            <h1>Access Logs</h1>
+    <table id="logs-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Timestamp</th>
+                <th>Status</th>
+                <th>User Name</th>
+            </tr>
+        </thead>
+        <tbody id="logs-body">
+            <!-- Logs will be inserted here -->
+        </tbody>
+    </table>
+        </div>
+    </div>
+
+    <script>
+        // Connect to WebSocket server
+        const socket = io('http://localhost:5000');
+
+        // Handle incoming sensor updates
+        socket.on('sensor_update', function(data) {
+            if (data.type === 'motion') {
+                const status = document.getElementById('motion-status');
+                status.textContent = `${data.location}: ${data.detected ? 'Motion Detected!' : 'Clear'}`;
+                status.className = `status ${data.detected ? 'alert' : 'clear'}`;
+                status.innerHTML += `<div class="timestamp">${new Date(data.timestamp).toLocaleString()}</div>`;
+            }
+            else if (data.type === 'door') {
+                const status = document.getElementById('door-status');
+                status.textContent = `${data.location}: ${data.status}`;
+                status.className = `status ${data.status === 'open' ? 'alert' : 'clear'}`;
+                status.innerHTML += `<div class="timestamp">${new Date(data.timestamp).toLocaleString()}</div>`;
+            }
+            else if (data.type === 'window') {
+                const status = document.getElementById('window-status');
+                status.textContent = `${data.location}: ${data.status}`;
+                status.className = `status ${data.status === 'open' ? 'alert' : 'clear'}`;
+                status.innerHTML += `<div class="timestamp">${new Date(data.timestamp).toLocaleString()}</div>`;
+            }
+            else if (data.type === 'camera') {
+                const status = document.getElementById('camera-status');
+                status.textContent = `${data.location}: ${data.event}`;
+                status.className = `status ${data.event !== 'Clear' ? 'alert' : 'clear'}`;
+                status.innerHTML += `<div class="timestamp">${new Date(data.timestamp).toLocaleString()}</div>`;
+            }
+            else if (data.type === 'environmental') {
+                document.getElementById('temperature').textContent = `Temperature: ${data.temperature}°F`;
+                document.getElementById('humidity').textContent = `Humidity: ${data.humidity}%`;
+                
+                const smoke = document.getElementById('smoke');
+                smoke.textContent = `Smoke: ${data.smoke_detected ? 'DETECTED!' : 'Clear'}`;
+                smoke.className = `reading ${data.smoke_detected ? 'alert' : ''}`;
+                
+                const co = document.getElementById('co');
+                co.textContent = `CO: ${data.co_detected ? 'DETECTED!' : 'Clear'}`;
+                co.className = `reading ${data.co_detected ? 'alert' : ''}`;
+            }
+        });
+
+        // Handle connection status
+        socket.on('connect', function() {
+            console.log('Connected to server');
+        });
+
+        socket.on('disconnect', function() {
+            console.log('Disconnected from server');
+        });
+        document.addEventListener("DOMContentLoaded", function() {
+    fetch('/api/access-logs')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok ' + response.statusText);
+            }
+            return response.json();
+        })
+        .then(data => {
+            const logsBody = document.getElementById('logs-body');
+            logsBody.innerHTML = ''; // Clear existing content
+
+            data.forEach(log => {
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td>${log._id}</td>
+                    <td>${new Date(log.timestamp).toLocaleString()}</td>
+                    <td>${log.status}</td>
+                    <td>${log.user_name}</td>
+                `;
+                
+                logsBody.appendChild(row);
+            });
+        })
+        .catch(error => {
+            console.error('Error fetching logs:', error);
+        });
+});
+
+
+    </script>
+</body>
+</html>
